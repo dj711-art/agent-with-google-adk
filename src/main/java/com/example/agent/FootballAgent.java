@@ -1,5 +1,7 @@
 package com.example.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
@@ -19,6 +21,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,6 +37,11 @@ public class FootballAgent {
     public static final String BASE_URL = "https://api.football-data.org/v4";
     // Cache: key = competition code (e.g. "PL"), value = String[2] where [0]=results JSON, [1]=fixtures JSON
     private static final ConcurrentHashMap<String, String[]> COMP_CACHE = new ConcurrentHashMap<>();
+    // Key team name value id
+    private static final ConcurrentHashMap<String, String> TEAM_IDs_CACHE = new ConcurrentHashMap<>();
+    static {
+        getPlTeamIds();
+    }
 
     public static BaseAgent initAgent() {
         return LlmAgent.builder()
@@ -120,6 +128,48 @@ public class FootballAgent {
         return Map.of("status", "success", "report", json);
     }
 
+    @Schema(name = "getPlTeamIds", description = "Returns PL team IDs and names (uses FOOTBALL_API_KEY).")
+    public static Map<String, String> getPlTeamIds() {
+        String apiKey = System.getenv("FOOTBALL_API_KEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            // example stub
+            String sample = "64: Liverpool\n65: Manchester City\n66: Chelsea";
+            return Map.of("status", "success", "report", sample);
+        }
+
+        String url = String.format("%s/competitions/PL/teams", BASE_URL);
+        String json = fetchUrlWithApiKey(url, apiKey);
+        if (json == null) {
+            return Map.of("status", "error", "report", "Failed to fetch PL teams.");
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(json);
+            JsonNode teams = root.path("teams");
+            if (!teams.isArray() || teams.isEmpty()) {
+                return Map.of("status", "error", "report", "No teams found in response.");
+            }
+
+            StringJoiner sj = new StringJoiner("\n");
+            for (JsonNode t : teams) {
+                JsonNode idNode = t.path("id");
+                JsonNode nameNode = t.path("name");
+                TEAM_IDs_CACHE.put(nameNode.asText(),idNode.asText());
+                if (!idNode.isMissingNode() && !nameNode.isMissingNode()) {
+                    sj.add(String.format("%s: %s", idNode.asText(), nameNode.asText()));
+                }
+            }
+
+            String result = sj.toString();
+            LOGGER.info(TEAM_IDs_CACHE.toString());
+            return Map.of("status", "success", "report", result);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error parsing PL teams JSON: " + e.getMessage());
+            return Map.of("status", "error", "report", "Failed to parse PL teams response.");
+        }
+    }
+
     // Returns upcoming fixtures for a team (accepts team ID or short name depending on API).
     public static Map<String, String> getFixtures(
             @Schema(name = "team", description = "Team ID or short name (depends on API provider)")
@@ -130,6 +180,9 @@ public class FootballAgent {
         }
 
         // Example endpoint — adapt to chosen API. If team is an ID, use it directly; otherwise implement lookup.
+        if (TEAM_IDs_CACHE.containsKey(team)){
+            team = TEAM_IDs_CACHE.get(team);
+        }
         String url = String.format("%s/teams/%s/matches?status=SCHEDULED", BASE_URL,team);
         String json = fetchUrlWithApiKey(url, apiKey);
         if (json == null) {
@@ -162,14 +215,14 @@ public class FootballAgent {
     // Helper: simple HTTP GET with X-Auth-Token header. Returns response body or null on failure.
     private static String fetchUrlWithApiKey(String url, String apiKey) {
         LOGGER.info("Fetching URL: " + url);
-        try (HttpClient client = HttpClient.newHttpClient();){
+        try (HttpClient client = HttpClient.newHttpClient()){
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("X-Auth-Token", apiKey)
                     .GET()
                     .build();
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            LOGGER.info(String.format("Football Agent status code: %s getLatestResults: %s" , resp.statusCode(),resp.body()));
+            LOGGER.info(String.format("Football Agent status code: %s response: %s" , resp.statusCode(),resp.body()));
             if (resp.statusCode() / 100 == 2) {
                 return resp.body();
             } else {
@@ -182,7 +235,7 @@ public class FootballAgent {
         }
     }
 
-    public static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         InMemoryRunner runner = new InMemoryRunner(ROOT_AGENT);
         Session session = runner.sessionService().createSession(NAME, USER_ID).blockingGet();
 
