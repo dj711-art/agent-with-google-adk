@@ -22,8 +22,8 @@ source .env
 Then select football_agent from the list of agents at the left corner.
 ![English Premier League Standings](/docs/EPL.png)
 ![Get latest result of a team](/docs/LatestResultForATeam.png)
-![Get latest result from the beginning](/docs/EPL Latest results from beginning.png)
-![Get latest result most recent](/docs/EPl latest result.png)
+![Get latest result from the beginning](/docs/EPLLatestResultsFromBeginning.png)
+![Get latest result most recent](/docs/EPl_latest_result.png)
 
 # Sample prompts
 * "EPL"
