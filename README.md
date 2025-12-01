@@ -4,3 +4,5 @@
 source .env
 ```
 * execute run.sh script
+
+![MultiAgent diagram](/docs/MultiAgent.png)
