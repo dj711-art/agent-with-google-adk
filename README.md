@@ -19,6 +19,7 @@ source .env
 ```declarative
 ./run.sh
 ```
+* open http://localhost:8000 in your browser
 Then select football_agent from the list of agents at the left corner.
 ![English Premier League Standings](/docs/EPL.png)
 ![Get latest result of a team](/docs/LatestResultForATeam.png)
