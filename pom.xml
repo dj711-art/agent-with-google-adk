@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>google-agent-dj</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <!-- Add this inside `project` in `pom.xml` -->
+    <repositories>
+        <!-- JitPack (if the project is published there) -->
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+
+        <!-- Example for a vendor or GitHub Packages repo; replace OWNER/REPO and URL as needed -->
+        <repository>
+            <id>google-adk-repo</id>
+            <url>https://maven.pkg.github.com/OWNER/REPO</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+
+    <dependencies>
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk</artifactId>
+            <version>0.4.0</version>
+        </dependency>
+        <!--
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>adk-core</artifactId>
+            <version>0.3.0</version>
+        </dependency>
+        -->
+        <!-- Dev UI -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-dev</artifactId>
+            <version>0.4.0</version>
+        </dependency>
+    </dependencies>
+
+</project>
