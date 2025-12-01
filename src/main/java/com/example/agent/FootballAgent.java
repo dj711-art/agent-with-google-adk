@@ -50,6 +50,7 @@ public class FootballAgent {
                 .description("Agent that provides latest football match results, upcoming fixtures and simple match analysis.")
                 .instruction("You are a helpful football assistant. Use available tools to return results, fixtures and analysis.")
                 .tools(
+                        FunctionTool.create(FootballAgent.class,"getPlTeamIds"),
                         FunctionTool.create(FootballAgent.class, "getEplDetails"),
                         FunctionTool.create(FootballAgent.class, "getLatestResults"),
                         FunctionTool.create(FootballAgent.class, "getFixtures"),
@@ -180,9 +181,11 @@ public class FootballAgent {
         }
 
         // Example endpoint — adapt to chosen API. If team is an ID, use it directly; otherwise implement lookup.
+        LOGGER.info("Passed TEAM : " + team);
         if (TEAM_IDs_CACHE.containsKey(team)){
             team = TEAM_IDs_CACHE.get(team);
         }
+        LOGGER.info("RESOLVED TEAM ID: " + team);
         String url = String.format("%s/teams/%s/matches?status=SCHEDULED", BASE_URL,team);
         String json = fetchUrlWithApiKey(url, apiKey);
         if (json == null) {
