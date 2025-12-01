@@ -25,6 +25,12 @@ Then select football_agent from the list of agents at the left corner.
 ![Get latest result from the beginning](/docs/EPLLatestResultsFromBeginning.png)
 ![Get latest result most recent](/docs/EPl_latest_result.png)
 ![Get next match of a team](/docs/GetFixtureLFC.png)
+![Analysis of a team performance](/docs/AnalysisTeamPerformance.png)
+
+# Improvements
+* Add more leagues
+* Improve prompt engineering for better results
+* More analysis
 # Sample prompts
 * "EPL"
 * "Get latest result"
