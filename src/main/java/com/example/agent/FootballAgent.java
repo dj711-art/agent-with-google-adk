@@ -19,6 +19,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +32,8 @@ public class FootballAgent {
 
     public static final BaseAgent ROOT_AGENT = initAgent();
     public static final String BASE_URL = "https://api.football-data.org/v4";
+    // Cache: key = competition code (e.g. "PL"), value = String[2] where [0]=results JSON, [1]=fixtures JSON
+    private static final ConcurrentHashMap<String, String[]> COMP_CACHE = new ConcurrentHashMap<>();
 
     public static BaseAgent initAgent() {
         return LlmAgent.builder()
@@ -99,8 +102,20 @@ public class FootballAgent {
         String json = fetchUrlWithApiKey(url, apiKey);
         LOGGER.info(String.format("Football Agent getLatestResults: %s" , json));
         if (json == null) {
+            if (COMP_CACHE.containsKey(competition)){
+                String cachedJson = COMP_CACHE.get(competition)[0];
+                if (cachedJson != null){
+                    return Map.of("status", "success", "report", cachedJson + "\n\n(Note: This is cached data due to API fetch failure.)");
+                }
+            }
             return Map.of("status", "error", "report", "Failed to fetch results for " + competition + ".");
         }
+        // Update cache: set index 1 to fixtures
+        COMP_CACHE.compute(competition, (k, v) -> {
+            String[] arr = (v == null) ? new String[2] : v;
+            arr[0] = json;
+            return arr;
+        });
         // For a minimal scaffold, return raw JSON as the report. Production: parse JSON and format.
         return Map.of("status", "success", "report", json);
     }
@@ -120,6 +135,7 @@ public class FootballAgent {
         if (json == null) {
             return Map.of("status", "error", "report", "Failed to fetch fixtures for " + team + ".");
         }
+
         return Map.of("status", "success", "report", json);
     }
 
@@ -146,13 +162,12 @@ public class FootballAgent {
     // Helper: simple HTTP GET with X-Auth-Token header. Returns response body or null on failure.
     private static String fetchUrlWithApiKey(String url, String apiKey) {
         LOGGER.info("Fetching URL: " + url);
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("X-Auth-Token", apiKey)
-                .GET()
-                .build();
-        try {
+        try (HttpClient client = HttpClient.newHttpClient();){
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("X-Auth-Token", apiKey)
+                    .GET()
+                    .build();
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             LOGGER.info(String.format("Football Agent status code: %s getLatestResults: %s" , resp.statusCode(),resp.body()));
             if (resp.statusCode() / 100 == 2) {

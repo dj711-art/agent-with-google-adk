@@ -4,8 +4,12 @@
 source .env
 ```
 * execute run.sh script
+```declarative
+./run.sh
+```
 ![English Premier League Standings](/docs/EPL.png)
-![MultiAgent diagram](/docs/MultiAgent.png)
+![Get latest result of a team](/docs/LatestResultForATeam.png)
+
 
 ## Configuration
 * Configuratoins
