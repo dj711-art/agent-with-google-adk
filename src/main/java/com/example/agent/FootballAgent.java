@@ -182,6 +182,9 @@ public class FootballAgent {
 
         // Example endpoint — adapt to chosen API. If team is an ID, use it directly; otherwise implement lookup.
         LOGGER.info("Passed TEAM : " + team);
+        if (!team.endsWith("FC")){
+            team = team + " FC";
+        }
         if (TEAM_IDs_CACHE.containsKey(team)){
             team = TEAM_IDs_CACHE.get(team);
         }
