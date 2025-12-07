@@ -1,5 +1,6 @@
 package com.example.agent;
 
+import com.example.agent.model.football.Team;
 import com.example.agent.util.SimpleRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,9 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -102,7 +101,7 @@ public class FootballAgent {
 
         // Returns a short report (raw JSON if API used) about latest finished matches for a competition.
     public static Map<String, String> getLatestResults(
-            @Schema(name = "competition", description = "Competition code or ID (e.g. PL, CL, BL1)")
+            @Schema(name = "competition", description = "Competition code or ID (e.g. WC, CL, BL1, DED, PL, CL, BL1)")
             String competition) {
         String apiKey = System.getenv("FOOTBALL_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
@@ -158,7 +157,12 @@ public class FootballAgent {
             }
 
             StringJoiner sj = new StringJoiner("\n");
+            //
+            List<Team> teamList = new ArrayList<>();
+
             for (JsonNode t : teams) {
+                // Parse each team node into Team object
+
                 JsonNode idNode = t.path("id");
                 JsonNode nameNode = t.path("name");
                 TEAM_IDs_CACHE.put(nameNode.asText(),idNode.asText());
