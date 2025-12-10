@@ -9,6 +9,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,6 +21,7 @@ import java.util.logging.Logger;
 public class FootballAPIRequestHandler {
     public static final String BASE_URL = "https://api.football-data.org/v4";
     private static final Logger LOGGER = Logger.getLogger(FootballAPIRequestHandler.class.getName());
+    // This rate liimiter allows 10 requests per 60 seconds and it is specific to football API, this is a better place to put it
     private static final SimpleRateLimiter RATE_LIMITER = new SimpleRateLimiter(10, 60_000L);
     // Add this field near other statics in FootballAgent
     private static final ConcurrentHashMap<String, String> URL_CACHE = new ConcurrentHashMap<>();
@@ -77,11 +81,20 @@ public class FootballAPIRequestHandler {
     }
 
     @NotNull
-    private static String getRootCause(Exception exception) {
+    private static String getRootCause(Throwable throwable) {
         StringBuilder rca = new StringBuilder();
-        while (exception.getCause() != null) {
-            rca.append(" Caused by: ").append(exception.getCause().toString());
-            exception = (Exception) exception.getCause();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = throwable;
+        while (current != null && !seen.contains(current)) {
+            seen.add(current);
+            Throwable cause = current.getCause();
+            if (cause != null) {
+                rca.append(" Caused by: ").append(cause.toString());
+            }
+            current = cause;
+        }
+        if (current != null) { // cycle detected
+            rca.append(" [cycle detected]");
         }
         return rca.toString();
     }
