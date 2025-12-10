@@ -26,23 +26,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.example.agent.util.FootballAPIRequestHandler.BASE_URL;
+import static com.example.agent.util.FootballAPIRequestHandler.fetchUrlWithApiKey;
+
 
 public class FootballAgent {
     private static final String USER_ID = "footydebm@gmail.com";
     private static final String NAME = "football_agent";
     private static final Logger LOGGER = Logger.getLogger(FootballAgent.class.getName());
-    private static final SimpleRateLimiter RATE_LIMITER = new SimpleRateLimiter(10, 60_000L);
+
 
 
 
     public static final BaseAgent ROOT_AGENT = initAgent();
-    public static final String BASE_URL = "https://api.football-data.org/v4";
+
     // Cache: key = competition code (e.g. "PL"), value = String[2] where [0]=results JSON, [1]=fixtures JSON
     private static final ConcurrentHashMap<String, String[]> COMP_CACHE = new ConcurrentHashMap<>();
     // Key team name value id
     private static final ConcurrentHashMap<String, String> TEAM_IDs_CACHE = new ConcurrentHashMap<>();
-    // Add this field near other statics in FootballAgent
-    private static final ConcurrentHashMap<String, String> URL_CACHE = new ConcurrentHashMap<>();
+
+    //
+    private static List<Team> teamList = new ArrayList<>();
     static {
         getPlTeamIds();
     }
@@ -50,18 +54,114 @@ public class FootballAgent {
     public static BaseAgent initAgent() {
         return LlmAgent.builder()
                 .name(NAME)
-                .model("gemini-2.0-flash")
+                .model("gemini-2.5-flash")
                 .description("Agent that provides latest football match results, upcoming fixtures and simple match analysis.")
-                .instruction("You are a helpful football assistant. Use available tools to return results, fixtures and analysis.")
+                .instruction("You are a helpful football assistant. Use available tools to return results, fixtures, team squad and analysis.")
                 .tools(
                         FunctionTool.create(FootballAgent.class,"getPlTeamIds"),
                         FunctionTool.create(FootballAgent.class, "getEplDetails"),
                         FunctionTool.create(FootballAgent.class, "getLatestResults"),
                         FunctionTool.create(FootballAgent.class, "getFixtures"),
-                        FunctionTool.create(FootballAgent.class, "analyzeMatch"))
+                        FunctionTool.create(FootballAgent.class, "analyzeMatch"),
+                        FunctionTool.create(FootballAgent.class, "getTeamSquad"))
                 .build();
 
 
+    }
+
+    @Schema(name = "getTeamSquad", description = "Returns squad for a team name or ID (uses FOOTBALL_API_KEY).")
+    public static Map<String, String> getTeamSquad(
+            @Schema(name = "team", description = "Team name or ID (e.g. Liverpool or 64)") String team) {
+        String apiKey = System.getenv("FOOTBALL_API_KEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            return Map.of("status", "success",
+                    "report", "No API key configured. Example: Squad: Player A, Player B, Player C (sample).");
+        }
+
+        if (team == null || team.isBlank()) {
+            return Map.of("status", "error", "report", "No team provided.");
+        }
+
+        String original = team.trim();
+        String teamId = null;
+
+        // direct cache lookup
+        if (TEAM_IDs_CACHE.containsKey(original)) {
+            teamId = TEAM_IDs_CACHE.get(original);
+        } else {
+            // try append " FC" for short names (keep same heuristic as getFixtures)
+            if (!original.endsWith("FC")) {
+                String t2 = original + " FC";
+                if (TEAM_IDs_CACHE.containsKey(t2)) {
+                    teamId = TEAM_IDs_CACHE.get(t2);
+                }
+            }
+            // case-insensitive and partial match in cache
+            if (teamId == null) {
+                for (Map.Entry<String, String> e : TEAM_IDs_CACHE.entrySet()) {
+                    String key = e.getKey();
+                    if (key.equalsIgnoreCase(original)
+                            || key.toLowerCase().contains(original.toLowerCase())
+                            || original.toLowerCase().contains(key.toLowerCase())) {
+                        teamId = e.getValue();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // numeric string provided -> treat as ID
+        if (teamId == null && original.matches("\\d+")) {
+            teamId = original;
+        }
+
+        // fallback: check loaded teamList (Team.fromJson entries)
+        if (teamId == null && teamList != null) {
+            for (Team t : teamList) {
+                try {
+                    String name = t.getName();
+                    String id = String.valueOf(t.getId());
+                    if (name != null && (name.equalsIgnoreCase(original)
+                            || name.toLowerCase().contains(original.toLowerCase())
+                            || original.toLowerCase().contains(name.toLowerCase()))) {
+                        teamId = id;
+                        LOGGER.info("=== Found squad for team " + name + " (id=" + id + ")");
+                        return Map.of("status", "success", "report", t.getSquad().toString());
+                    }
+                    if (original.equals(id)) {
+                        teamId = id;
+                        break;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        if (teamId == null) {
+            return Map.of("status", "error", "report",
+                    "Team not found: " + original + ". Try providing the numeric team ID or a more specific name.");
+        }
+
+        String url = String.format("%s/teams/%s", BASE_URL, teamId);
+        String json = fetchUrlWithApiKey(url, apiKey);
+        if (json == null) {
+            return Map.of("status", "error", "report",
+                    "Failed to fetch squad for " + original + " (id=" + teamId + ").");
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(json);
+            JsonNode squad = root.path("squad");
+            if (squad.isMissingNode() || squad.isEmpty()) {
+                return Map.of("status", "success", "report", json);
+            } else {
+                return Map.of("status", "success", "report", squad.toString());
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Error parsing squad JSON: " + e.getMessage());
+            return Map.of("status", "success", "report", json);
+        }
     }
 
     @Schema(name = "getEplDetails", description = "Returns English Premier League (EPL) competition details. Uses FOOTBALL_API_KEY when configured.")
@@ -157,18 +257,20 @@ public class FootballAgent {
             }
 
             StringJoiner sj = new StringJoiner("\n");
-            //
-            List<Team> teamList = new ArrayList<>();
 
-            for (JsonNode t : teams) {
+
+            for (JsonNode teamJsonNode : teams) {
                 // Parse each team node into Team object
 
-                JsonNode idNode = t.path("id");
-                JsonNode nameNode = t.path("name");
+                JsonNode idNode = teamJsonNode.path("id");
+                JsonNode nameNode = teamJsonNode.path("name");
                 TEAM_IDs_CACHE.put(nameNode.asText(),idNode.asText());
                 if (!idNode.isMissingNode() && !nameNode.isMissingNode()) {
                     sj.add(String.format("%s: %s", idNode.asText(), nameNode.asText()));
                 }
+
+
+                teamList.add(Team.fromJson(teamJsonNode));
             }
             LOGGER.info(TEAM_IDs_CACHE.toString());
         } catch (Exception e) {
@@ -223,62 +325,6 @@ public class FootballAgent {
         return Map.of("status", "success", "report", analysis);
     }
 
-    // Helper: simple HTTP GET with X-Auth-Token header. Returns response body or null on failure.
-    private static String fetchUrlWithApiKey(String url, String apiKey) {
-        LOGGER.info("Fetching URL: " + url);
-        // Enforce rate limit (10 requests per 60 seconds)
-        // Enforce rate limit (10 requests per 60 seconds)
-        if (!RATE_LIMITER.tryAcquire()) {
-            LOGGER.warning("Rate limit exceeded for fetchUrlWithApiKey — attempting to return cached response if available.");
-            String cached = URL_CACHE.get(url);
-            if (cached != null) {
-                LOGGER.info("Returning cached response for URL: " + url);
-                return cached;
-            }
-            LOGGER.warning("No cached response available for URL: " + url);
-            return null;
-        }
-        try (HttpClient client = HttpClient.newHttpClient()){
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("X-Auth-Token", apiKey)
-                    .GET()
-                    .build();
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            LOGGER.info(String.format("Football Agent status code: %s response: %s" , resp.statusCode(),resp.body()));
-            if (resp.statusCode() / 100 == 2) {
-                String body = resp.body();
-                // update URL cache on successful fetch
-                URL_CACHE.put(url, body);
-                return body;
-            } else {
-                // non-2xx: try to return cached if present
-                String cached = URL_CACHE.get(url);
-                if (cached != null) {
-                    LOGGER.info("Non-2xx response — returning cached response for URL: " + url);
-                    return cached;
-                }
-                return null;
-            }
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            String cached = URL_CACHE.get(url);
-            if (cached != null) {
-                LOGGER.info("Interrupted — returning cached response for URL: " + url);
-                return cached;
-            }
-            LOGGER.log(Level.SEVERE, "Football Agent fetchUrlWithApiKey interrupted: " + ie.getMessage());
-            return null;
-        } catch (IOException ioe) {
-            String cached = URL_CACHE.get(url);
-            if (cached != null) {
-                LOGGER.info("IO error — returning cached response for URL: " + url);
-                return cached;
-            }
-            LOGGER.log(Level.SEVERE, "Football Agent fetchUrlWithApiKey IO error: " + ioe.getMessage());
-            return null;
-        }
-    }
 
     static void main(String[] args) {
         InMemoryRunner runner = new InMemoryRunner(ROOT_AGENT);
