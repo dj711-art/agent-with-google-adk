@@ -1,0 +1,70 @@
+{
+  "competition": "Fictional Premier League",
+  "season": "2025",
+  "teams": [
+    {
+      "id": 1,
+      "name": "Springfield United",
+      "shortName": "SpringU",
+      "tla": "SPU",
+      "crestUrl": "https://example.org/crests/springfield.png",
+      "address": "1 Main St, Springfield",
+      "website": "https://springfield-united.example",
+      "founded": "1899",
+      "clubColors": "Red / White",
+      "venue": "Springfield Arena",
+      "coach": {
+        "id": 101,
+        "name": "John Smith",
+        "nationality": "English",
+        "dateOfBirth": "1975-04-12",
+        "contract": {
+          "startDate": "2023-07-01",
+          "endDate": "2026-06-30"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Rivertown Rovers",
+      "shortName": "RivR",
+      "tla": "RVR",
+      "crest": "https://example.org/crests/rivertown.svg",
+      "address": "42 River Rd, Rivertown",
+      "website": "https://rivertown-rovers.example",
+      "founded": "1920",
+      "clubColors": "Blue / Black",
+      "venue": "Riverside Stadium",
+      "coach": {
+        "id": "202",
+        "name": "María Gómez",
+        "nationality": "Spanish",
+        "dateOfBirth": "1980-11-05",
+        "contract": {
+          "start": "2024-01-15",
+          "until": "2027-12-31"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "name": "Highland FC",
+      "shortName": "HFC",
+      "tla": "HLD",
+      "crestUrl": null,
+      "address": "10 Highland Way",
+      "website": "https://highland-fc.example",
+      "founded": "1965",
+      "clubColors": "Green / Yellow",
+      "venue": "Highland Park",
+      "coach": {
+        "id": "303",
+        "name": "Ana Lopez",
+        "nationality": "Argentinian",
+        "dateOfBirth": "1982-02-20",
+        "contractStart": "2021-08-01",
+        "contractEnd": "2024-07-31"
+      }
+    }
+  ]
+}

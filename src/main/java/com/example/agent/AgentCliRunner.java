@@ -7,6 +7,7 @@ import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
+
 import java.util.Scanner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
