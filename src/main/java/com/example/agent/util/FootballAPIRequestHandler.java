@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 public class FootballAPIRequestHandler {
     public static final String BASE_URL = "https://api.football-data.org/v4";
     private static final Logger LOGGER = Logger.getLogger(FootballAPIRequestHandler.class.getName());
-    // This rate liimiter allows 10 requests per 60 seconds and it is specific to football API, this is a better place to put it
+    // This rate limiter allows 10 requests per 60 seconds and it is specific to football API, this is a better place to put it
     private static final SimpleRateLimiter RATE_LIMITER = new SimpleRateLimiter(10, 60_000L);
     // Add this field near other statics in FootballAgent
     private static final ConcurrentHashMap<String, String> URL_CACHE = new ConcurrentHashMap<>();
