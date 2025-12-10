@@ -94,7 +94,7 @@ public final class GenAiRetryHelper {
                         if ("retry-after".equalsIgnoreCase(key) || "Retry-After".equalsIgnoreCase(key)) {
                             List<String> vals = headers.get(key);
                             if (vals != null && !vals.isEmpty()) {
-                                String v = vals.getFirst().trim();
+                                String v = vals.get(0).trim();
                                 try {
                                     return Integer.parseInt(v);
                                 } catch (NumberFormatException ignore) {}

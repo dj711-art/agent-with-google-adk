@@ -37,7 +37,8 @@ public class FootballAPIRequestHandler {
             LOGGER.warning("No cached response available for URL: " + url);
             return null;
         }
-        try (HttpClient client = HttpClient.newHttpClient()){
+        HttpClient client = HttpClient.newHttpClient();
+        try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("X-Auth-Token", apiKey)
