@@ -1,7 +1,6 @@
 package com.example.agent;
 
 import com.example.agent.model.football.Team;
-import com.example.agent.util.SimpleRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.agents.BaseAgent;
@@ -16,10 +15,6 @@ import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
