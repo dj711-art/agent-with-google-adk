@@ -1,6 +1,8 @@
 package com.example.agent.util;// java
 
+import com.google.genai.errors.ApiException;
 import com.google.genai.errors.ClientException;
+import com.google.genai.errors.ServerException;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -18,8 +20,9 @@ public final class GenAiRetryHelper {
     private GenAiRetryHelper() {}
 
     /**
-     * Call a task and retry on 429. Honors a numeric "Retry-After" if found in the exception message
-     * or headers (attempts reflective inspection). Uses exponential backoff with jitter otherwise.
+     * Call a task and retry on 429 (rate limit) or 503 (model overloaded). Honors a numeric "Retry-After" 
+     * if found in the exception message or headers (attempts reflective inspection). 
+     * Uses exponential backoff with jitter otherwise.
      *
      * @param task the callable that performs the GenAI request
      * @param maxRetries maximum retry attempts (excluding the first try)
@@ -39,19 +42,33 @@ public final class GenAiRetryHelper {
                 if (attempt > maxRetries) throw e;
 
                 Integer retryAfterSec = extractRetryAfterSeconds(e);
-                long waitMillis;
-                if (retryAfterSec != null && retryAfterSec > 0) {
-                    waitMillis = TimeUnit.SECONDS.toMillis(retryAfterSec);
-                } else {
-                    // exponential backoff with jitter
-                    long expo = baseDelayMillis * (1L << (attempt - 1));
-                    long jitter = ThreadLocalRandom.current().nextLong(0, Math.min(3000, expo / 4) + 1);
-                    waitMillis = expo + jitter;
-                }
+                long waitMillis = calculateWaitTime(retryAfterSec, attempt, baseDelayMillis);
 
                 LOGGER.info(String.format("Received 429 - retrying in %d ms (attempt %d/%d)", waitMillis, attempt, maxRetries));
                 Thread.sleep(waitMillis);
+            } catch (ServerException e) {
+                if (!is503(e)) throw e;
+                attempt++;
+                if (attempt > maxRetries) throw e;
+
+                Integer retryAfterSec = extractRetryAfterSeconds(e);
+                long waitMillis = calculateWaitTime(retryAfterSec, attempt, baseDelayMillis);
+
+                LOGGER.info(String.format("Received 503 (model overloaded) - retrying in %d ms (attempt %d/%d)", waitMillis, attempt, maxRetries));
+                Thread.sleep(waitMillis);
             }
+        }
+    }
+
+    // Calculate wait time with exponential backoff and jitter
+    private static long calculateWaitTime(Integer retryAfterSec, int attempt, long baseDelayMillis) {
+        if (retryAfterSec != null && retryAfterSec > 0) {
+            return TimeUnit.SECONDS.toMillis(retryAfterSec);
+        } else {
+            // exponential backoff with jitter
+            long expo = baseDelayMillis * (1L << (attempt - 1));
+            long jitter = ThreadLocalRandom.current().nextLong(0, Math.min(3000, expo / 4) + 1);
+            return expo + jitter;
         }
     }
 
@@ -68,8 +85,21 @@ public final class GenAiRetryHelper {
         return false;
     }
 
+    // Basic detection: check message text contains 503 or model overloaded
+    private static boolean is503(ServerException e) {
+        String m = e.getMessage();
+        if (m != null && (m.contains("503") || m.toLowerCase().contains("overloaded"))) return true;
+        // try reflective access if exception type provides status or code
+        try {
+            Method codeMethod = e.getClass().getMethod("getStatusCode");
+            Object code = codeMethod.invoke(e);
+            if (code instanceof Number && ((Number) code).intValue() == 503) return true;
+        } catch (Exception ignore) {}
+        return false;
+    }
+
     // Try parsing Retry-After (seconds) from message, or inspect response headers via reflection.
-    private static Integer extractRetryAfterSeconds(ClientException e) {
+    private static Integer extractRetryAfterSeconds(ApiException e) {
         String msg = e.getMessage();
         if (msg != null) {
             // common forms: "Retry-After: 120" or "retry after 120 seconds"
