@@ -42,6 +42,34 @@ Then select football_agent from the list of agents at the left corner.
 * Improve prompt engineering for better results
 * More analysis
 
+# Error Handling
+
+## Model Overload (503 Errors)
+
+The Google GenAI API may occasionally return 503 errors when the model is overloaded. This project includes a retry helper utility (`GenAiRetryHelper`) that can handle these transient errors with exponential backoff.
+
+### Using the Retry Helper
+
+For direct GenAI API calls, you can wrap them with the retry logic:
+
+```java
+import com.example.agent.util.GenAiRetryHelper;
+
+String result = GenAiRetryHelper.callWithRetry(() -> {
+    // Your GenAI API call
+    return genAiClient.generateContent(prompt);
+}, 3, 1000L); // 3 retries, 1 second base delay
+```
+
+See [GenAiRetryHelper README](src/main/java/com/example/agent/util/README.md) for more details.
+
+### ADK Framework Limitations
+
+The ADK framework (InMemoryRunner) handles LLM calls internally and may not automatically retry on 503 errors. If you encounter frequent 503 errors:
+- Consider upgrading to a higher-tier API plan with better quota
+- Use the retry helper for custom GenAI interactions
+- Implement error handling at the application level to catch and retry failed agent runs
+
 
 
  

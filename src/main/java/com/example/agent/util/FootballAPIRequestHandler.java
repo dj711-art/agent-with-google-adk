@@ -21,6 +21,8 @@ public class FootballAPIRequestHandler {
     private static final SimpleRateLimiter RATE_LIMITER = new SimpleRateLimiter(10, 60_000L);
     // Add this field near other statics in FootballAgent
     private static final ConcurrentHashMap<String, String> URL_CACHE = new ConcurrentHashMap<>();
+    // Shared HTTP client instance - HttpClient is thread-safe and designed to be reused
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     // Helper: simple HTTP GET with X-Auth-Token header. Returns response body or null on failure.
     public static String fetchUrlWithApiKey(String url, String apiKey) {
@@ -37,7 +39,7 @@ public class FootballAPIRequestHandler {
             LOGGER.warning("No cached response available for URL: " + url);
             return null;
         }
-        HttpClient client = HttpClient.newHttpClient();
+        HttpClient client = HTTP_CLIENT;
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
