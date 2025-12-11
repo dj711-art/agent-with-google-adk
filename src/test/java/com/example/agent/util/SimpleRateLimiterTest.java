@@ -43,7 +43,8 @@ class SimpleRateLimiterTest {
         final SimpleRateLimiter limiter = new SimpleRateLimiter(maxRequests, 1_000L);
 
         int threads = 20;
-        try (ExecutorService es = Executors.newFixedThreadPool(threads)) {
+        ExecutorService es = Executors.newFixedThreadPool(threads);
+        try {
             CountDownLatch start = new CountDownLatch(1);
             List<Future<Boolean>> futures = new ArrayList<>();
 
@@ -64,7 +65,7 @@ class SimpleRateLimiterTest {
 
             // Exactly maxRequests should succeed
             assertEquals(maxRequests, successCount, "Number of successful acquisitions should equal the configured maxRequests");
-
+        } finally {
             es.shutdownNow();
             assertTrue(es.awaitTermination(1, TimeUnit.SECONDS));
         }
